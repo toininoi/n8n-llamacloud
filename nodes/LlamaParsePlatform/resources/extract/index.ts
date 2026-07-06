@@ -57,8 +57,8 @@ export const extractProperties: INodeProperties[] = [
 			'ID of the LlamaExtract configuration that defines the schema and prompts. Create one in the LlamaCloud dashboard under Extract.',
 	},
 	{
-		displayName: 'Binary Property',
-		name: 'binaryPropertyName',
+		displayName: 'Input Data Field Name',
+		name: 'inputDataFieldName',
 		type: 'string',
 		required: true,
 		displayOptions: {

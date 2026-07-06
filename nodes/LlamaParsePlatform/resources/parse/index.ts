@@ -2,30 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const parseProperties: INodeProperties[] = [
 	{
-		displayName: 'File Source',
-		name: 'fileSource',
-		type: 'options',
-		options: [
-			{
-				name: 'Binary Data',
-				value: 'binaryData',
-				description: 'Provide binary data as file input for parsing',
-			},
-			{
-				name: 'File URL',
-				value: 'fileUrl',
-				description: 'Use a publicly accessible URL as file input for parsing',
-			},
-		],
-		default: 'binaryData',
-		noDataExpression: true,
-		displayOptions: {
-			show: {
-				operation: ['parse'],
-			},
-		},
-	},
-	{
 		displayName: 'Tier',
 		name: 'tier',
 		type: 'options',
@@ -75,14 +51,38 @@ export const parseProperties: INodeProperties[] = [
 			'Version of the Parse service to use. Use "latest" unless you need to pin to a specific release.',
 	},
 	{
-		displayName: 'Binary Property',
-		name: 'binaryPropertyName',
+		displayName: 'Input Type',
+		name: 'inputType',
+		type: 'options',
+		options: [
+			{
+				name: 'Binary File',
+				value: 'binaryFile',
+				description: 'Provide binary data as file input for parsing',
+			},
+			{
+				name: 'File URL',
+				value: 'fileUrl',
+				description: 'Use a publicly accessible URL as file input for parsing',
+			},
+		],
+		default: 'binaryFile',
+		noDataExpression: true,
+		displayOptions: {
+			show: {
+				operation: ['parse'],
+			},
+		},
+	},
+	{
+		displayName: 'Input Data Field Name',
+		name: 'inputDataFieldName',
 		type: 'string',
 		required: true,
 		displayOptions: {
 			show: {
 				operation: ['parse'],
-				fileSource: ['binaryData'],
+				inputType: ['binaryFile'],
 			},
 		},
 		default: 'data',
@@ -90,18 +90,18 @@ export const parseProperties: INodeProperties[] = [
 		description: "Name of the input item's binary property that holds the file to parse",
 	},
 	{
-		displayName: 'File URL',
+		displayName: 'URL',
 		name: 'sourceUrl',
 		type: 'string',
 		required: true,
 		displayOptions: {
 			show: {
 				operation: ['parse'],
-				fileSource: ['fileUrl'],
+				inputType: ['fileUrl'],
 			},
 		},
 		default: '',
-		placeholder: 'https://example.com/download/file.pdf',
+		placeholder: 'e.g. https://example.com/download/file.pdf',
 		description: 'Publicly available URL associated with the file to parse',
 	},
 ];

@@ -120,13 +120,13 @@ export class LlamaParsePlatform implements INodeType {
 						| 'agentic_plus';
 					const version = this.getNodeParameter('version', i) as string;
 
-					const fileSource = this.getNodeParameter('fileSource', i) as 'binaryData' | 'fileUrl';
+					const fileSource = this.getNodeParameter('inputType', i) as 'binaryFile' | 'fileUrl';
 					const http = { apiKey, baseUrl };
 
 					let parseBody: Record<string, unknown>;
 
-					if (fileSource == 'binaryData') {
-						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					if (fileSource == 'binaryFile') {
+						const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
 						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 						let fileId: string;
@@ -195,7 +195,7 @@ export class LlamaParsePlatform implements INodeType {
 					}
 				} else if (operation === 'classify') {
 					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
 					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 					// Get additional fields input
@@ -279,7 +279,7 @@ export class LlamaParsePlatform implements INodeType {
 					}
 				} else if (operation === 'extract') {
 					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
 					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 					// Get additional fields input
@@ -415,7 +415,7 @@ export class LlamaParsePlatform implements INodeType {
 					});
 				} else if (operation === 'split') {
 					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
 					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 					// Get credentials
