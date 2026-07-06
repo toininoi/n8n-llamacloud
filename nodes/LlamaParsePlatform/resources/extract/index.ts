@@ -57,6 +57,30 @@ export const extractProperties: INodeProperties[] = [
 			'ID of the LlamaExtract configuration that defines the schema and prompts. Create one in the LlamaCloud dashboard under Extract.',
 	},
 	{
+		displayName: 'Input Type',
+		name: 'inputType',
+		type: 'options',
+		options: [
+			{
+				name: 'Binary File',
+				value: 'binaryFile',
+				description: 'Provide binary data as file input for extraction',
+			},
+			{
+				name: 'File ID',
+				value: 'fileId',
+				description: 'Provide the ID of a file uploaded to the LlamaParse Platform',
+			},
+		],
+		default: 'binaryFile',
+		noDataExpression: true,
+		displayOptions: {
+			show: {
+				operation: ['extract'],
+			},
+		},
+	},
+	{
 		displayName: 'Input Data Field Name',
 		name: 'inputDataFieldName',
 		type: 'string',
@@ -64,10 +88,26 @@ export const extractProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['extract'],
+				inputType: ['binaryFile'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
 		description: "Name of the input item's binary property that holds the file to extract from",
+	},
+	{
+		displayName: 'File ID',
+		name: 'fileId',
+		type: 'string',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['extract'],
+				inputType: ['fileId'],
+			},
+		},
+		default: '',
+		placeholder: 'e.g. 14977a95-8b09-47a9-a309-b4f1c3593742',
+		description: 'ID of a file previously uploaded using the "Upload a File" action',
 	},
 ];

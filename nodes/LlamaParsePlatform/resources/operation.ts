@@ -43,6 +43,12 @@ export const operationProperty: INodeProperties = {
 			description: 'Split a document into segments by category',
 			action: 'Split a document',
 		},
+		{
+			name: 'Upload a File',
+			value: 'uploadFile',
+			description: 'Upload a file to the LlamaParse Platform so it can be reused across operations',
+			action: 'Upload a file',
+		},
 	],
 	default: 'parse',
 };

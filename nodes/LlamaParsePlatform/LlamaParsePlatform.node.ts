@@ -18,6 +18,7 @@ import {
 	parseProperties,
 	retrieveProperties,
 	splitProperties,
+	uploadFileProperties,
 } from './resources/index.js';
 import type {
 	ClassifyRule,
@@ -58,6 +59,7 @@ export class LlamaParsePlatform implements INodeType {
 			...extractProperties,
 			...retrieveProperties,
 			...splitProperties,
+			...uploadFileProperties,
 		],
 		usableAsTool: true,
 	};
@@ -103,7 +105,8 @@ export class LlamaParsePlatform implements INodeType {
 			| 'classify'
 			| 'extract'
 			| 'retrieveIndex'
-			| 'split';
+			| 'split'
+			| 'uploadFile';
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -120,12 +123,15 @@ export class LlamaParsePlatform implements INodeType {
 						| 'agentic_plus';
 					const version = this.getNodeParameter('version', i) as string;
 
-					const fileSource = this.getNodeParameter('inputType', i) as 'binaryFile' | 'fileUrl';
+					const fileSource = this.getNodeParameter('inputType', i) as
+						| 'binaryFile'
+						| 'fileUrl'
+						| 'fileId';
 					const http = { apiKey, baseUrl };
 
 					let parseBody: Record<string, unknown>;
 
-					if (fileSource == 'binaryFile') {
+					if (fileSource === 'binaryFile') {
 						const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
 						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
@@ -145,9 +151,12 @@ export class LlamaParsePlatform implements INodeType {
 							);
 						}
 						parseBody = { file_id: fileId, tier, version };
-					} else {
+					} else if (fileSource === 'fileUrl') {
 						const sourceUrl = this.getNodeParameter('sourceUrl', i) as string;
 						parseBody = { source_url: sourceUrl, tier, version };
+					} else {
+						const fileId = this.getNodeParameter('fileId', i) as string;
+						parseBody = { file_id: fileId, tier, version };
 					}
 
 					const expand: string[] = tier === 'fast' ? ['text_full'] : ['text_full', 'markdown_full'];
@@ -194,10 +203,7 @@ export class LlamaParsePlatform implements INodeType {
 						});
 					}
 				} else if (operation === 'classify') {
-					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
-					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					const fileSource = this.getNodeParameter('inputType', i) as 'fileId' | 'binaryFile';
 					// Get additional fields input
 					const credentials = await this.getCredentials('llamaParseApi');
 					const apiKey = credentials.apiKey as string;
@@ -213,19 +219,28 @@ export class LlamaParsePlatform implements INodeType {
 					const http = { apiKey, baseUrl };
 
 					let fileId: string;
-					try {
-						fileId = await uploadFile(http, {
-							buffer,
-							mimeType: binaryData.mimeType,
-							fileName: binaryData.fileName,
-							fileExtension: binaryData.fileExtension,
-						});
-					} catch (e) {
-						throw new NodeApiError(
-							this.getNode(),
-							{ message: `Could not upload the file: ${errorMessage(e)}` },
-							{ itemIndex: i },
-						);
+
+					if (fileSource === 'binaryFile') {
+						// Get binary data input
+						const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
+						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+						try {
+							fileId = await uploadFile(http, {
+								buffer,
+								mimeType: binaryData.mimeType,
+								fileName: binaryData.fileName,
+								fileExtension: binaryData.fileExtension,
+							});
+						} catch (e) {
+							throw new NodeApiError(
+								this.getNode(),
+								{ message: `Could not upload the file: ${errorMessage(e)}` },
+								{ itemIndex: i },
+							);
+						}
+					} else {
+						fileId = this.getNodeParameter('fileId', i) as string;
 					}
 
 					const classifyRules: ClassifyRule[] = rules.rules.map((rule) => ({
@@ -278,10 +293,7 @@ export class LlamaParsePlatform implements INodeType {
 						);
 					}
 				} else if (operation === 'extract') {
-					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
-					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					const fileSource = this.getNodeParameter('inputType', i) as 'fileId' | 'binaryFile';
 					// Get additional fields input
 					const credentials = await this.getCredentials('llamaParseApi');
 					const apiKey = credentials.apiKey as string;
@@ -311,19 +323,28 @@ export class LlamaParsePlatform implements INodeType {
 					}
 
 					let fileId: string;
-					try {
-						fileId = await uploadFile(http, {
-							buffer,
-							mimeType: binaryData.mimeType,
-							fileName: binaryData.fileName,
-							fileExtension: binaryData.fileExtension,
-						});
-					} catch (e) {
-						throw new NodeApiError(
-							this.getNode(),
-							{ message: `Could not upload the file: ${errorMessage(e)}` },
-							{ itemIndex: i },
-						);
+
+					if (fileSource === 'binaryFile') {
+						// Get binary data input
+						const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
+						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+						try {
+							fileId = await uploadFile(http, {
+								buffer,
+								mimeType: binaryData.mimeType,
+								fileName: binaryData.fileName,
+								fileExtension: binaryData.fileExtension,
+							});
+						} catch (e) {
+							throw new NodeApiError(
+								this.getNode(),
+								{ message: `Could not upload the file: ${errorMessage(e)}` },
+								{ itemIndex: i },
+							);
+						}
+					} else {
+						fileId = this.getNodeParameter('fileId', i) as string;
 					}
 
 					// 1) Create extract job.
@@ -414,10 +435,7 @@ export class LlamaParsePlatform implements INodeType {
 						pairedItem: { item: i },
 					});
 				} else if (operation === 'split') {
-					// Get binary data input
-					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
-					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					const fileSource = this.getNodeParameter('inputType', i) as 'fileId' | 'binaryFile';
 					// Get credentials
 					const credentials = await this.getCredentials('llamaParseApi');
 					const apiKey = credentials.apiKey as string;
@@ -447,19 +465,28 @@ export class LlamaParsePlatform implements INodeType {
 						| 'omit';
 
 					let fileId: string;
-					try {
-						fileId = await uploadFile(http, {
-							buffer,
-							mimeType: binaryData.mimeType,
-							fileName: binaryData.fileName,
-							fileExtension: binaryData.fileExtension,
-						});
-					} catch (e) {
-						throw new NodeApiError(
-							this.getNode(),
-							{ message: `Could not upload the file: ${errorMessage(e)}` },
-							{ itemIndex: i },
-						);
+
+					if (fileSource === 'binaryFile') {
+						// Get binary data input
+						const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
+						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+						try {
+							fileId = await uploadFile(http, {
+								buffer,
+								mimeType: binaryData.mimeType,
+								fileName: binaryData.fileName,
+								fileExtension: binaryData.fileExtension,
+							});
+						} catch (e) {
+							throw new NodeApiError(
+								this.getNode(),
+								{ message: `Could not upload the file: ${errorMessage(e)}` },
+								{ itemIndex: i },
+							);
+						}
+					} else {
+						fileId = this.getNodeParameter('fileId', i) as string;
 					}
 
 					// 1) Create split job.
@@ -510,6 +537,35 @@ export class LlamaParsePlatform implements INodeType {
 							pairedItem: { item: i },
 						});
 					}
+				} else if (operation === 'uploadFile') {
+					// Get binary data input
+					const binaryPropertyName = this.getNodeParameter('inputDataFieldName', i) as string;
+					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					// Get credentials
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
+					const http = { apiKey, baseUrl };
+
+					let fileId: string;
+					try {
+						fileId = await uploadFile(http, {
+							buffer,
+							mimeType: binaryData.mimeType,
+							fileName: binaryData.fileName,
+							fileExtension: binaryData.fileExtension,
+						});
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not upload the file: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					returnData.push({ json: { fileId }, pairedItem: { item: i } });
 				} else {
 					// this is a non-HTTP related failure, hence the NodeOperationError
 					throw new NodeOperationError(
