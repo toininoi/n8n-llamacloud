@@ -61,6 +61,11 @@ export const parseProperties: INodeProperties[] = [
 				description: 'Provide binary data as file input for parsing',
 			},
 			{
+				name: 'File ID',
+				value: 'fileId',
+				description: 'Provide the ID of a file uploaded to the LlamaParse Platform',
+			},
+			{
 				name: 'File URL',
 				value: 'fileUrl',
 				description: 'Use a publicly accessible URL as file input for parsing',
@@ -88,6 +93,21 @@ export const parseProperties: INodeProperties[] = [
 		default: 'data',
 		placeholder: 'data',
 		description: "Name of the input item's binary property that holds the file to parse",
+	},
+	{
+		displayName: 'File ID',
+		name: 'fileId',
+		type: 'string',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['parse'],
+				inputType: ['fileId'],
+			},
+		},
+		default: '',
+		placeholder: 'e.g. 14977a95-8b09-47a9-a309-b4f1c3593742',
+		description: 'ID of a file previously uploaded using the "Upload a File" action',
 	},
 	{
 		displayName: 'URL',

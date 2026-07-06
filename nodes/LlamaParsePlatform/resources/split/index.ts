@@ -60,6 +60,30 @@ export const splitProperties: INodeProperties[] = [
 		},
 	},
 	{
+		displayName: 'Input Type',
+		name: 'inputType',
+		type: 'options',
+		options: [
+			{
+				name: 'Binary File',
+				value: 'binaryFile',
+				description: 'Provide binary data as file input for splitting',
+			},
+			{
+				name: 'File ID',
+				value: 'fileId',
+				description: 'Provide the ID of a file uploaded to the LlamaParse Platform',
+			},
+		],
+		default: 'binaryFile',
+		noDataExpression: true,
+		displayOptions: {
+			show: {
+				operation: ['split'],
+			},
+		},
+	},
+	{
 		displayName: 'Input Data Field Name',
 		name: 'inputDataFieldName',
 		type: 'string',
@@ -67,10 +91,26 @@ export const splitProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['split'],
+				inputType: ['binaryFile'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
 		description: "Name of the input item's binary property that holds the file to split",
+	},
+	{
+		displayName: 'File ID',
+		name: 'fileId',
+		type: 'string',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['split'],
+				inputType: ['fileId'],
+			},
+		},
+		default: '',
+		placeholder: 'e.g. 14977a95-8b09-47a9-a309-b4f1c3593742',
+		description: 'ID of a file previously uploaded using the "Upload a File" action',
 	},
 ];

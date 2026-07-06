@@ -12,3 +12,4 @@ guides/html/assets/
 codegen/sdk-checks/sdk-check
 sdk-old/
 legacy_nodes/
+webhook.sh

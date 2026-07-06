@@ -44,6 +44,30 @@ export const classifyProperties: INodeProperties[] = [
 		},
 	},
 	{
+		displayName: 'Input Type',
+		name: 'inputType',
+		type: 'options',
+		options: [
+			{
+				name: 'Binary File',
+				value: 'binaryFile',
+				description: 'Provide binary data as file input for classification',
+			},
+			{
+				name: 'File ID',
+				value: 'fileId',
+				description: 'Provide the ID of a file uploaded to the LlamaParse Platform',
+			},
+		],
+		default: 'binaryFile',
+		noDataExpression: true,
+		displayOptions: {
+			show: {
+				operation: ['classify'],
+			},
+		},
+	},
+	{
 		displayName: 'Input Data Field Name',
 		name: 'inputDataFieldName',
 		type: 'string',
@@ -51,10 +75,26 @@ export const classifyProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['classify'],
+				inputType: ['binaryFile'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
 		description: "Name of the input item's binary property that holds the file to classify",
+	},
+	{
+		displayName: 'File ID',
+		name: 'fileId',
+		type: 'string',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['classify'],
+				inputType: ['fileId'],
+			},
+		},
+		default: '',
+		placeholder: 'e.g. 14977a95-8b09-47a9-a309-b4f1c3593742',
+		description: 'ID of a file previously uploaded using the "Upload a File" action',
 	},
 ];
