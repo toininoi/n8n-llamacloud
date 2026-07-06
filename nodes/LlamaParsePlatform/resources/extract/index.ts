@@ -2,27 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const extractProperties: INodeProperties[] = [
 	{
-		displayName: 'Operation',
-		name: 'operation',
-		type: 'options',
-		displayOptions: {
-			show: {
-				resource: ['extracting'],
-			},
-		},
-		options: [
-			{
-				name: 'Extract',
-				value: 'extract',
-				description:
-					'Extract structured data from a document using a saved extraction configuration',
-				action: 'Extract structured data from a document',
-			},
-		],
-		default: 'extract',
-		noDataExpression: true,
-	},
-	{
 		displayName: 'Configuration Mode',
 		name: 'configMode',
 		type: 'options',
@@ -43,7 +22,6 @@ export const extractProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['extract'],
-				resource: ['extracting'],
 			},
 		},
 	},
@@ -55,7 +33,6 @@ export const extractProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['extract'],
-				resource: ['extracting'],
 				configMode: ['schema'],
 			},
 		},
@@ -71,7 +48,6 @@ export const extractProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['extract'],
-				resource: ['extracting'],
 				configMode: ['configId'],
 			},
 		},
@@ -88,7 +64,6 @@ export const extractProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['extract'],
-				resource: ['extracting'],
 			},
 		},
 		default: 'data',

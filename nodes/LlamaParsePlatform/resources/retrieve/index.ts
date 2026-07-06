@@ -2,27 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const retrieveProperties: INodeProperties[] = [
 	{
-		displayName: 'Operation',
-		name: 'operation',
-		type: 'options',
-		displayOptions: {
-			show: {
-				resource: ['retrieval'],
-			},
-		},
-		options: [
-			{
-				name: 'Retrieve From Index',
-				value: 'retrieveIndex',
-				description:
-					'Retrieve context from a LlamaCloud Index using the /api/v1/retrieval/retrieve endpoint',
-				action: 'Retrieve context from an index',
-			},
-		],
-		default: 'retrieveIndex',
-		noDataExpression: true,
-	},
-	{
 		displayName: 'Index ID',
 		name: 'indexId',
 		type: 'resourceLocator',
@@ -49,7 +28,6 @@ export const retrieveProperties: INodeProperties[] = [
 		description: 'The LlamaCloud Index to retrieve from',
 		displayOptions: {
 			show: {
-				resource: ['retrieval'],
 				operation: ['retrieveIndex'],
 			},
 		},
@@ -64,7 +42,6 @@ export const retrieveProperties: INodeProperties[] = [
 			'The natural-language query to retrieve context for. Defaults to the chatInput field on the current item so the node works as an AI Agent tool out of the box.',
 		displayOptions: {
 			show: {
-				resource: ['retrieval'],
 				operation: ['retrieveIndex'],
 			},
 		},
@@ -80,7 +57,6 @@ export const retrieveProperties: INodeProperties[] = [
 		description: 'Maximum number of context chunks to return',
 		displayOptions: {
 			show: {
-				resource: ['retrieval'],
 				operation: ['retrieveIndex'],
 			},
 		},

@@ -2,26 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const splitProperties: INodeProperties[] = [
 	{
-		displayName: 'Operation',
-		name: 'operation',
-		type: 'options',
-		displayOptions: {
-			show: {
-				resource: ['splitting'],
-			},
-		},
-		options: [
-			{
-				name: 'Split',
-				value: 'split',
-				description: 'Split a document into segments by category',
-				action: 'Split a file',
-			},
-		],
-		default: 'split',
-		noDataExpression: true,
-	},
-	{
 		displayName: 'Categories',
 		name: 'categoriesUi',
 		placeholder: 'Add Category',
@@ -58,7 +38,6 @@ export const splitProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['split'],
-				resource: ['splitting'],
 			},
 		},
 	},
@@ -77,7 +56,6 @@ export const splitProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['split'],
-				resource: ['splitting'],
 			},
 		},
 	},
@@ -89,11 +67,10 @@ export const splitProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['split'],
-				resource: ['splitting'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
-		description: 'Name of the input item\'s binary property that holds the file to split',
+		description: "Name of the input item's binary property that holds the file to split",
 	},
 ];

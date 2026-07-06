@@ -2,24 +2,28 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const parseProperties: INodeProperties[] = [
 	{
-		displayName: 'Operation',
-		name: 'operation',
+		displayName: 'File Source',
+		name: 'fileSource',
 		type: 'options',
-		displayOptions: {
-			show: {
-				resource: ['parsing'],
-			},
-		},
 		options: [
 			{
-				name: 'Parse',
-				value: 'parse',
-				description: 'Parse a document into clean text or Markdown',
-				action: 'Parse a document',
+				name: 'Binary Data',
+				value: 'binaryData',
+				description: 'Provide binary data as file input for parsing',
+			},
+			{
+				name: 'File URL',
+				value: 'fileUrl',
+				description: 'Use a publicly accessible URL as file input for parsing',
 			},
 		],
-		default: 'parse',
+		default: 'binaryData',
 		noDataExpression: true,
+		displayOptions: {
+			show: {
+				operation: ['parse'],
+			},
+		},
 	},
 	{
 		displayName: 'Tier',
@@ -28,7 +32,6 @@ export const parseProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['parse'],
-				resource: ['parsing'],
 			},
 		},
 		options: [
@@ -64,7 +67,6 @@ export const parseProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['parse'],
-				resource: ['parsing'],
 			},
 		},
 		default: 'latest',
@@ -80,11 +82,26 @@ export const parseProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['parse'],
-				resource: ['parsing'],
+				fileSource: ['binaryData'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
 		description: "Name of the input item's binary property that holds the file to parse",
+	},
+	{
+		displayName: 'File URL',
+		name: 'sourceUrl',
+		type: 'string',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['parse'],
+				fileSource: ['fileUrl'],
+			},
+		},
+		default: '',
+		placeholder: 'https://example.com/download/file.pdf',
+		description: 'Publicly available URL associated with the file to parse',
 	},
 ];
