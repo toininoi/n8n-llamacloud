@@ -14,6 +14,7 @@ import { getJSON, postJSON, pollUntil, uploadFile, errorMessage } from './resour
 import {
 	classifyProperties,
 	extractProperties,
+	operationProperty,
 	parseProperties,
 	retrieveProperties,
 	splitProperties,
@@ -30,7 +31,8 @@ import type {
 export class LlamaParsePlatform implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'LlamaParse Platform',
-		subtitle: '={{$parameter["operation"]}}',
+		subtitle:
+			'={{ ({ parse: "Parse a document", classify: "Classify a document", extract: "Extract structured data", retrieveIndex: "Retrieve context from an index", split: "Split a document" })[$parameter["operation"]] }}',
 		name: 'llamaParsePlatform',
 		icon: { light: 'file:./llamaindex_white.svg', dark: 'file:./llamaindex_dark.svg' },
 		group: ['transform'],
@@ -50,37 +52,7 @@ export class LlamaParsePlatform implements INodeType {
 			},
 		],
 		properties: [
-			{
-				displayName: 'Resource',
-				name: 'resource',
-				type: 'options',
-				options: [
-					{
-						name: 'Classify',
-						value: 'classifying',
-					},
-					{
-						name: 'Extract',
-						value: 'extracting',
-					},
-					{
-						name: 'Parse',
-						value: 'parsing',
-					},
-					{
-						name: 'Retrieve',
-						value: 'retrieval',
-					},
-					{
-						name: 'Split',
-						value: 'splitting',
-					},
-				],
-				default: 'parsing',
-				noDataExpression: true,
-				required: true,
-				description: 'The LlamaCloud service to use on the input document',
-			},
+			operationProperty,
 			...parseProperties,
 			...classifyProperties,
 			...extractProperties,
@@ -126,12 +98,6 @@ export class LlamaParsePlatform implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const resource = this.getNodeParameter('resource', 0) as
-			| 'parsing'
-			| 'classifying'
-			| 'extracting'
-			| 'retrieval'
-			| 'splitting';
 		const operation = this.getNodeParameter('operation', 0) as
 			| 'parse'
 			| 'classify'
@@ -139,29 +105,30 @@ export class LlamaParsePlatform implements INodeType {
 			| 'retrieveIndex'
 			| 'split';
 
-		// For each item, make an API call to create a contact
 		for (let i = 0; i < items.length; i++) {
 			try {
-				if (resource === 'parsing') {
-					if (operation === 'parse') {
-						// Get binary data input
+				if (operation === 'parse') {
+					// Get additional fields input
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
+					const tier = this.getNodeParameter('tier', i) as
+						| 'fast'
+						| 'cost_effective'
+						| 'agentic'
+						| 'agentic_plus';
+					const version = this.getNodeParameter('version', i) as string;
+
+					const fileSource = this.getNodeParameter('fileSource', i) as 'binaryData' | 'fileUrl';
+					const http = { apiKey, baseUrl };
+
+					let parseBody: Record<string, unknown>;
+
+					if (fileSource == 'binaryData') {
 						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
 						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-						// Get additional fields input
-						const credentials = await this.getCredentials('llamaParseApi');
-						const apiKey = credentials.apiKey as string;
-						const baseUrl =
-							(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
-						const tier = this.getNodeParameter('tier', i) as
-							| 'fast'
-							| 'cost_effective'
-							| 'agentic'
-							| 'agentic_plus';
-						const version = this.getNodeParameter('version', i) as string;
-
-						const http = { apiKey, baseUrl };
-
 						let fileId: string;
 						try {
 							fileId = await uploadFile(http, {
@@ -177,421 +144,377 @@ export class LlamaParsePlatform implements INodeType {
 								{ itemIndex: i },
 							);
 						}
-
-						const expand: string[] =
-							tier === 'fast' ? ['text_full'] : ['text_full', 'markdown_full'];
-
-						// 1) Create the parse job (POST /api/v2/parse).
-						let jobId: string;
-						try {
-							const job = await postJSON<{ id: string }>(http, '/api/v2/parse', {
-								file_id: fileId,
-								tier,
-								version,
-							});
-							jobId = job.id;
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not create parse job: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 2) Poll GET /api/v2/parse/{job_id} until terminal status.
-						const parsed = await pollUntil<ParseStatus>(
-							() => getJSON<ParseStatus>(http, `/api/v2/parse/${jobId}`, { expand }),
-							(r) => {
-								return r?.job?.status === 'COMPLETED';
-							},
-							(r) => r?.job?.status === 'FAILED' || r?.job?.status === 'CANCELLED',
-							(r) =>
-								`Parse job ${jobId} ${r?.job?.status}: ${r?.job?.error_message ?? 'unknown error'}`,
-							{ label: `Parse job ${jobId}` },
-						);
-
-						if (parsed.markdown_full) {
-							returnData.push({
-								json: { text: parsed.markdown_full },
-								pairedItem: { item: i },
-							});
-						} else if (parsed.text_full) {
-							returnData.push({
-								json: { text: parsed.text_full },
-								pairedItem: { item: i },
-							});
-						} else {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(this.getNode(), 'Could not parse the file', {
-								itemIndex: i,
-							});
-						}
+						parseBody = { file_id: fileId, tier, version };
 					} else {
-						// this is a non-HTTP related failure, hence the NodeOperationError
-						throw new NodeOperationError(
+						const sourceUrl = this.getNodeParameter('sourceUrl', i) as string;
+						parseBody = { source_url: sourceUrl, tier, version };
+					}
+
+					const expand: string[] = tier === 'fast' ? ['text_full'] : ['text_full', 'markdown_full'];
+
+					// 1) Create the parse job (POST /api/v2/parse).
+					let jobId: string;
+					try {
+						const job = await postJSON<{ id: string }>(http, '/api/v2/parse', parseBody);
+						jobId = job.id;
+					} catch (e) {
+						throw new NodeApiError(
 							this.getNode(),
-							`Operation ${operation} not supported for resource ${resource}`,
+							{ message: `Could not create parse job: ${errorMessage(e)}` },
 							{ itemIndex: i },
 						);
 					}
-				} else if (resource === 'classifying') {
-					if (operation === 'classify') {
-						// Get binary data input
-						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-						// Get additional fields input
-						const credentials = await this.getCredentials('llamaParseApi');
-						const apiKey = credentials.apiKey as string;
-						const baseUrl =
-							(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
 
-						const rules = this.getNodeParameter('rulesUi', i) as {
-							rules: {
-								category: string;
-								description: string;
-							}[];
-						};
-						const http = { apiKey, baseUrl };
+					// 2) Poll GET /api/v2/parse/{job_id} until terminal status.
+					const parsed = await pollUntil<ParseStatus>(
+						() => getJSON<ParseStatus>(http, `/api/v2/parse/${jobId}`, { expand }),
+						(r) => {
+							return r?.job?.status === 'COMPLETED';
+						},
+						(r) => r?.job?.status === 'FAILED' || r?.job?.status === 'CANCELLED',
+						(r) =>
+							`Parse job ${jobId} ${r?.job?.status}: ${r?.job?.error_message ?? 'unknown error'}`,
+						{ label: `Parse job ${jobId}` },
+					);
 
-						let fileId: string;
-						try {
-							fileId = await uploadFile(http, {
-								buffer,
-								mimeType: binaryData.mimeType,
-								fileName: binaryData.fileName,
-								fileExtension: binaryData.fileExtension,
-							});
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not upload the file: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						const classifyRules: ClassifyRule[] = rules.rules.map((rule) => ({
-							type: rule.category,
-							description: rule.description,
-						}));
-
-						// 1) Create classify job.
-						let jobId: string;
-						try {
-							const job = await postJSON<{ id: string }>(http, '/api/v2/classify', {
-								file_input: fileId,
-								configuration: { rules: classifyRules },
-							});
-							jobId = job.id;
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not create classify job: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 2) Poll until complete.
-						const result = await pollUntil<ClassifyStatus>(
-							() => getJSON<ClassifyStatus>(http, `/api/v2/classify/${jobId}`),
-							(r) => {
-								return r?.status === 'COMPLETED';
-							},
-							(r) => r?.status === 'FAILED',
-							(r) => `Classify job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
-							{ label: `Classify job ${jobId}` },
-						);
-
-						if (result.result) {
-							returnData.push({
-								json: {
-									category: result.result.type ?? 'unclassified',
-									reasons: result.result.reasoning,
-									confidence: result.result.confidence,
-								},
-								pairedItem: { item: i },
-							});
-						} else {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(
-								this.getNode(),
-								'Could not produce a classification for the file',
-								{ itemIndex: i },
-							);
-						}
-					} else {
-						// this is a non-HTTP related failure, hence the NodeOperationError
-						throw new NodeOperationError(
-							this.getNode(),
-							`Operation ${operation} not supported for resource ${resource}`,
-							{ itemIndex: i },
-						);
-					}
-				} else if (resource === 'extracting') {
-					if (operation === 'extract') {
-						// Get binary data input
-						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-						// Get additional fields input
-						const credentials = await this.getCredentials('llamaParseApi');
-						const apiKey = credentials.apiKey as string;
-						const baseUrl =
-							(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
-
-						const configMode = this.getNodeParameter('configMode', i) as 'schema' | 'configId';
-						const http = { apiKey, baseUrl };
-
-						let extractJobBody: Record<string, unknown>;
-						if (configMode === 'schema') {
-							let ds = this.getNodeParameter('dataSchema', i) as unknown;
-							if (typeof ds === 'string') {
-								ds = JSON.parse(ds);
-							} else if (typeof ds !== 'object') {
-								// Not an HTTP-related exception, hence not a NodeApiError
-								throw new NodeOperationError(
-									this.getNode(),
-									`Invalid input type for data schema: ${typeof ds}`,
-									{ itemIndex: i },
-								);
-							}
-							extractJobBody = { configuration: { data_schema: ds } };
-						} else {
-							const configId = this.getNodeParameter('configId', i) as string;
-							extractJobBody = { configuration_id: configId };
-						}
-
-						let fileId: string;
-						try {
-							fileId = await uploadFile(http, {
-								buffer,
-								mimeType: binaryData.mimeType,
-								fileName: binaryData.fileName,
-								fileExtension: binaryData.fileExtension,
-							});
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not upload the file: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 1) Create extract job.
-						let jobId: string;
-						try {
-							const job = await postJSON<{ id: string }>(http, '/api/v2/extract', {
-								file_input: fileId,
-								...extractJobBody,
-							});
-							jobId = job.id;
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not create extract job: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 2) Poll until complete.
-						const result = await pollUntil<ExtractStatus>(
-							() => getJSON<ExtractStatus>(http, `/api/v2/extract/${jobId}`),
-							(r) => {
-								return r?.status === 'COMPLETED';
-							},
-							(r) => r?.status === 'FAILED' || r?.status === 'CANCELLED',
-							(r) => `Extract job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
-							{ label: `Extract job ${jobId}` },
-						);
-
-						if (result.extract_result) {
-							const stringified = JSON.stringify(result.extract_result, null, 2);
-							const obj: IDataObject = { result: stringified };
-							returnData.push({ json: obj, pairedItem: { item: i } });
-						} else {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(this.getNode(), 'Could not extract data', {
-								itemIndex: i,
-							});
-						}
-					} else {
-						// this is a non-HTTP related failure, hence the NodeOperationError
-						throw new NodeOperationError(
-							this.getNode(),
-							`Operation ${operation} not supported for resource ${resource}`,
-							{ itemIndex: i },
-						);
-					}
-				} else if (resource === 'retrieval') {
-					if (operation === 'retrieveIndex') {
-						const credentials = await this.getCredentials('llamaParseApi');
-						const apiKey = credentials.apiKey as string;
-						const baseUrl =
-							(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
-						const http = { apiKey, baseUrl };
-
-						const indexId = this.getNodeParameter('indexId', i) as { value: string };
-						const queryRaw = this.getNodeParameter('query', i, '') as unknown;
-						const query = typeof queryRaw === 'string' ? queryRaw : String(queryRaw ?? '');
-						const topKRaw = this.getNodeParameter('topK', i, 5) as unknown;
-						const topK = Number.parseInt(String(topKRaw), 10) || 5;
-
-						if (!indexId) {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(this.getNode(), 'Index ID is required', {
-								itemIndex: i,
-							});
-						}
-						if (!query) {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(
-								this.getNode(),
-								'Query is required (defaults to {{ $json.chatInput }})',
-								{ itemIndex: i },
-							);
-						}
-
-						const contextTexts: string[] = [];
-						try {
-							const result = await postJSON<{ results: Array<{ content: string }> }>(
-								http,
-								'/api/v1/retrieval/retrieve',
-								{ index_id: indexId.value, query, top_k: topK },
-							);
-							for (const node of result.results ?? []) {
-								if (node?.content) contextTexts.push(node.content);
-							}
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not retrieve context: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
+					if (parsed.markdown_full) {
 						returnData.push({
-							json: { context: contextTexts },
+							json: { text: parsed.markdown_full },
+							pairedItem: { item: i },
+						});
+					} else if (parsed.text_full) {
+						returnData.push({
+							json: { text: parsed.text_full },
+							pairedItem: { item: i },
+						});
+					} else {
+						// this is a non-HTTP related failure, hence the NodeOperationError
+						throw new NodeOperationError(this.getNode(), 'Could not parse the file', {
+							itemIndex: i,
+						});
+					}
+				} else if (operation === 'classify') {
+					// Get binary data input
+					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					// Get additional fields input
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
+
+					const rules = this.getNodeParameter('rulesUi', i) as {
+						rules: {
+							category: string;
+							description: string;
+						}[];
+					};
+					const http = { apiKey, baseUrl };
+
+					let fileId: string;
+					try {
+						fileId = await uploadFile(http, {
+							buffer,
+							mimeType: binaryData.mimeType,
+							fileName: binaryData.fileName,
+							fileExtension: binaryData.fileExtension,
+						});
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not upload the file: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					const classifyRules: ClassifyRule[] = rules.rules.map((rule) => ({
+						type: rule.category,
+						description: rule.description,
+					}));
+
+					// 1) Create classify job.
+					let jobId: string;
+					try {
+						const job = await postJSON<{ id: string }>(http, '/api/v2/classify', {
+							file_input: fileId,
+							configuration: { rules: classifyRules },
+						});
+						jobId = job.id;
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not create classify job: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					// 2) Poll until complete.
+					const result = await pollUntil<ClassifyStatus>(
+						() => getJSON<ClassifyStatus>(http, `/api/v2/classify/${jobId}`),
+						(r) => {
+							return r?.status === 'COMPLETED';
+						},
+						(r) => r?.status === 'FAILED',
+						(r) => `Classify job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
+						{ label: `Classify job ${jobId}` },
+					);
+
+					if (result.result) {
+						returnData.push({
+							json: {
+								category: result.result.type ?? 'unclassified',
+								reasons: result.result.reasoning,
+								confidence: result.result.confidence,
+							},
 							pairedItem: { item: i },
 						});
 					} else {
 						// this is a non-HTTP related failure, hence the NodeOperationError
 						throw new NodeOperationError(
 							this.getNode(),
-							`Operation ${operation} not supported for resource ${resource}`,
+							'Could not produce a classification for the file',
 							{ itemIndex: i },
 						);
 					}
-				} else if (resource === 'splitting') {
-					if (operation === 'split') {
-						// Get binary data input
-						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-						// Get credentials
-						const credentials = await this.getCredentials('llamaParseApi');
-						const apiKey = credentials.apiKey as string;
-						const baseUrl =
-							(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
-						const http = { apiKey, baseUrl };
+				} else if (operation === 'extract') {
+					// Get binary data input
+					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					// Get additional fields input
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
 
-						const categoriesParam = this.getNodeParameter('categoriesUi', i, {}) as {
-							categories?: { name: string; description?: string }[];
-						};
-						const categories: SplitCategory[] = (categoriesParam.categories ?? []).map((c) => ({
-							name: c.name,
-							...(c.description ? { description: c.description } : {}),
-						}));
-						if (categories.length === 0) {
-							// this is a non-HTTP related failure, hence the NodeOperationError
+					const configMode = this.getNodeParameter('configMode', i) as 'schema' | 'configId';
+					const http = { apiKey, baseUrl };
+
+					let extractJobBody: Record<string, unknown>;
+					if (configMode === 'schema') {
+						let ds = this.getNodeParameter('dataSchema', i) as unknown;
+						if (typeof ds === 'string') {
+							ds = JSON.parse(ds);
+						} else if (typeof ds !== 'object') {
+							// Not an HTTP-related exception, hence not a NodeApiError
 							throw new NodeOperationError(
 								this.getNode(),
-								'At least one Category is required to split a document',
+								`Invalid input type for data schema: ${typeof ds}`,
 								{ itemIndex: i },
 							);
 						}
-
-						const allowUncategorized = this.getNodeParameter('allowUncategorized', i, 'include') as
-							| 'include'
-							| 'forbid'
-							| 'omit';
-
-						let fileId: string;
-						try {
-							fileId = await uploadFile(http, {
-								buffer,
-								mimeType: binaryData.mimeType,
-								fileName: binaryData.fileName,
-								fileExtension: binaryData.fileExtension,
-							});
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not upload the file: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 1) Create split job.
-						let jobId: string;
-						try {
-							const job = await postJSON<{ id: string }>(http, '/api/v1/beta/split/jobs', {
-								document_input: { type: 'file_id', value: fileId },
-								configuration: {
-									categories,
-									splitting_strategy: { allow_uncategorized: allowUncategorized },
-								},
-							});
-							jobId = job.id;
-						} catch (e) {
-							throw new NodeApiError(
-								this.getNode(),
-								{ message: `Could not create split job: ${errorMessage(e)}` },
-								{ itemIndex: i },
-							);
-						}
-
-						// 2) Poll until complete. Status values are lowercase here:
-						//    pending | processing | completed | failed | cancelled.
-						const result = await pollUntil<SplitStatus>(
-							() => getJSON<SplitStatus>(http, `/api/v1/beta/split/jobs/${jobId}`),
-							(r) => r?.status === 'completed',
-							(r) => r?.status === 'failed' || r?.status === 'cancelled',
-							(r) => `Split job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
-							{ label: `Split job ${jobId}` },
-						);
-
-						const segments = result.result?.segments ?? [];
-						if (segments.length === 0) {
-							// this is a non-HTTP related failure, hence the NodeOperationError
-							throw new NodeOperationError(
-								this.getNode(),
-								'Split job completed but produced no segments',
-								{ itemIndex: i },
-							);
-						}
-						for (const seg of segments) {
-							returnData.push({
-								json: {
-									category: seg.category,
-									confidence: seg.confidence_category,
-									pages: seg.pages,
-								},
-								pairedItem: { item: i },
-							});
-						}
+						extractJobBody = { configuration: { data_schema: ds } };
 					} else {
+						const configId = this.getNodeParameter('configId', i) as string;
+						extractJobBody = { configuration_id: configId };
+					}
+
+					let fileId: string;
+					try {
+						fileId = await uploadFile(http, {
+							buffer,
+							mimeType: binaryData.mimeType,
+							fileName: binaryData.fileName,
+							fileExtension: binaryData.fileExtension,
+						});
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not upload the file: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					// 1) Create extract job.
+					let jobId: string;
+					try {
+						const job = await postJSON<{ id: string }>(http, '/api/v2/extract', {
+							file_input: fileId,
+							...extractJobBody,
+						});
+						jobId = job.id;
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not create extract job: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					// 2) Poll until complete.
+					const result = await pollUntil<ExtractStatus>(
+						() => getJSON<ExtractStatus>(http, `/api/v2/extract/${jobId}`),
+						(r) => {
+							return r?.status === 'COMPLETED';
+						},
+						(r) => r?.status === 'FAILED' || r?.status === 'CANCELLED',
+						(r) => `Extract job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
+						{ label: `Extract job ${jobId}` },
+					);
+
+					if (result.extract_result) {
+						const stringified = JSON.stringify(result.extract_result, null, 2);
+						const obj: IDataObject = { result: stringified };
+						returnData.push({ json: obj, pairedItem: { item: i } });
+					} else {
+						// this is a non-HTTP related failure, hence the NodeOperationError
+						throw new NodeOperationError(this.getNode(), 'Could not extract data', {
+							itemIndex: i,
+						});
+					}
+				} else if (operation === 'retrieveIndex') {
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
+					const http = { apiKey, baseUrl };
+
+					const indexId = this.getNodeParameter('indexId', i) as { value: string };
+					const queryRaw = this.getNodeParameter('query', i, '') as unknown;
+					const query = typeof queryRaw === 'string' ? queryRaw : String(queryRaw ?? '');
+					const topKRaw = this.getNodeParameter('topK', i, 5) as unknown;
+					const topK = Number.parseInt(String(topKRaw), 10) || 5;
+
+					if (!indexId) {
+						// this is a non-HTTP related failure, hence the NodeOperationError
+						throw new NodeOperationError(this.getNode(), 'Index ID is required', {
+							itemIndex: i,
+						});
+					}
+					if (!query) {
 						// this is a non-HTTP related failure, hence the NodeOperationError
 						throw new NodeOperationError(
 							this.getNode(),
-							`Operation ${operation} not supported for resource ${resource}`,
+							'Query is required (defaults to {{ $json.chatInput }})',
 							{ itemIndex: i },
 						);
+					}
+
+					const contextTexts: string[] = [];
+					try {
+						const result = await postJSON<{ results: Array<{ content: string }> }>(
+							http,
+							'/api/v1/retrieval/retrieve',
+							{ index_id: indexId.value, query, top_k: topK },
+						);
+						for (const node of result.results ?? []) {
+							if (node?.content) contextTexts.push(node.content);
+						}
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not retrieve context: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					returnData.push({
+						json: { context: contextTexts },
+						pairedItem: { item: i },
+					});
+				} else if (operation === 'split') {
+					// Get binary data input
+					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+					const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+					// Get credentials
+					const credentials = await this.getCredentials('llamaParseApi');
+					const apiKey = credentials.apiKey as string;
+					const baseUrl =
+						(credentials.baseURL as string | null) ?? 'https://api.cloud.llamaindex.ai';
+					const http = { apiKey, baseUrl };
+
+					const categoriesParam = this.getNodeParameter('categoriesUi', i, {}) as {
+						categories?: { name: string; description?: string }[];
+					};
+					const categories: SplitCategory[] = (categoriesParam.categories ?? []).map((c) => ({
+						name: c.name,
+						...(c.description ? { description: c.description } : {}),
+					}));
+					if (categories.length === 0) {
+						// this is a non-HTTP related failure, hence the NodeOperationError
+						throw new NodeOperationError(
+							this.getNode(),
+							'At least one Category is required to split a document',
+							{ itemIndex: i },
+						);
+					}
+
+					const allowUncategorized = this.getNodeParameter('allowUncategorized', i, 'include') as
+						| 'include'
+						| 'forbid'
+						| 'omit';
+
+					let fileId: string;
+					try {
+						fileId = await uploadFile(http, {
+							buffer,
+							mimeType: binaryData.mimeType,
+							fileName: binaryData.fileName,
+							fileExtension: binaryData.fileExtension,
+						});
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not upload the file: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					// 1) Create split job.
+					let jobId: string;
+					try {
+						const job = await postJSON<{ id: string }>(http, '/api/v1/beta/split/jobs', {
+							document_input: { type: 'file_id', value: fileId },
+							configuration: {
+								categories,
+								splitting_strategy: { allow_uncategorized: allowUncategorized },
+							},
+						});
+						jobId = job.id;
+					} catch (e) {
+						throw new NodeApiError(
+							this.getNode(),
+							{ message: `Could not create split job: ${errorMessage(e)}` },
+							{ itemIndex: i },
+						);
+					}
+
+					// 2) Poll until complete. Status values are lowercase here:
+					//    pending | processing | completed | failed | cancelled.
+					const result = await pollUntil<SplitStatus>(
+						() => getJSON<SplitStatus>(http, `/api/v1/beta/split/jobs/${jobId}`),
+						(r) => r?.status === 'completed',
+						(r) => r?.status === 'failed' || r?.status === 'cancelled',
+						(r) => `Split job ${jobId} ${r?.status}: ${r?.error_message ?? 'unknown error'}`,
+						{ label: `Split job ${jobId}` },
+					);
+
+					const segments = result.result?.segments ?? [];
+					if (segments.length === 0) {
+						// this is a non-HTTP related failure, hence the NodeOperationError
+						throw new NodeOperationError(
+							this.getNode(),
+							'Split job completed but produced no segments',
+							{ itemIndex: i },
+						);
+					}
+					for (const seg of segments) {
+						returnData.push({
+							json: {
+								category: seg.category,
+								confidence: seg.confidence_category,
+								pages: seg.pages,
+							},
+							pairedItem: { item: i },
+						});
 					}
 				} else {
 					// this is a non-HTTP related failure, hence the NodeOperationError
 					throw new NodeOperationError(
 						this.getNode(),
-						`Resource ${resource} not supported for this node`,
+						`Operation ${operation} not supported for this node`,
 						{ itemIndex: i },
 					);
 				}

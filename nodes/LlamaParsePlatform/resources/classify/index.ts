@@ -2,26 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 
 export const classifyProperties: INodeProperties[] = [
 	{
-		displayName: 'Operation',
-		name: 'operation',
-		type: 'options',
-		displayOptions: {
-			show: {
-				resource: ['classifying'],
-			},
-		},
-		options: [
-			{
-				name: 'Classify',
-				value: 'classify',
-				description: 'Classify a document into one of your defined categories',
-				action: 'Classify a document',
-			},
-		],
-		default: 'classify',
-		noDataExpression: true,
-	},
-	{
 		displayName: 'Rules',
 		name: 'rulesUi',
 		placeholder: 'Add Rule',
@@ -60,7 +40,6 @@ export const classifyProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['classify'],
-				resource: ['classifying'],
 			},
 		},
 	},
@@ -72,11 +51,10 @@ export const classifyProperties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['classify'],
-				resource: ['classifying'],
 			},
 		},
 		default: 'data',
 		placeholder: 'data',
-		description: 'Name of the input item\'s binary property that holds the file to classify',
+		description: "Name of the input item's binary property that holds the file to classify",
 	},
 ];
