@@ -60,8 +60,8 @@ export const splitProperties: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Binary Property',
-		name: 'binaryPropertyName',
+		displayName: 'Input Data Field Name',
+		name: 'inputDataFieldName',
 		type: 'string',
 		required: true,
 		displayOptions: {
