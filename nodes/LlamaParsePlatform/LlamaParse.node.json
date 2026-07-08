@@ -14,5 +14,20 @@
 				"url": "https://developers.llamaindex.ai/llamaparse/general/api_key/"
 			}
 		]
-	}
+	},
+	"alias": [
+		"pdf",
+		"extract",
+		"ocr",
+		"invoice",
+		"scan",
+		"parse",
+		"parser",
+		"parsing",
+		"document",
+		"document parsing",
+		"llamaparse",
+		"llama parse",
+		"text extraction"
+	]
 }
