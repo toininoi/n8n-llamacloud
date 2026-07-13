@@ -1,5 +1,5 @@
 {
-	"node": "LlamaParsePlatform",
+	"node": "@llamaindex/n8n-nodes-llamacloud.llamaParsePlatform",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Development"],
